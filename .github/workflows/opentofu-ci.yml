@@ -1,0 +1,131 @@
+name: OpenTofu CI
+
+on:
+  workflow_call:
+    inputs:
+      runs_on:
+        description: "Runner to use"
+        required: false
+        default: "ubuntu-latest"
+        type: string
+      working_directory:
+        description: "Working directory for OpenTofu commands"
+        required: false
+        default: "."
+        type: string
+      opentofu_version:
+        description: "OpenTofu version to use (leave empty for latest)"
+        required: false
+        default: ""
+        type: string
+      enable_security_scan:
+        description: "Enable security scanning with Checkov and TFSec"
+        required: false
+        default: false
+        type: boolean
+      enable_docs:
+        description: "Enable automatic documentation generation"
+        required: false
+        default: false
+        type: boolean
+      docs_output_file:
+        description: "Output file for terraform-docs"
+        required: false
+        default: "README.md"
+        type: string
+      allowed_pr_author:
+        description: "GitHub username allowed to run on PRs (empty for all)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  lint:
+    name: OpenTofu Lint & Validate
+    runs-on: ${{ inputs.runs_on }}
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (
+        github.event_name == 'pull_request' &&
+        (inputs.allowed_pr_author == '' || github.event.pull_request.user.login == inputs.allowed_pr_author)
+      )
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@12f4debbf681675350b6cd1f0ff8ecfbda62027b # v1
+        with:
+          tofu_version: ${{ inputs.opentofu_version || null }}
+
+      - name: OpenTofu Format Check
+        run: tofu fmt -check -recursive
+
+      - name: OpenTofu Init
+        run: tofu init -backend=false
+
+      - name: OpenTofu Validate
+        run: tofu validate
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
+
+      - name: Init TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: tflint --recursive
+
+  security:
+    name: Security Scanning
+    runs-on: ${{ inputs.runs_on }}
+    if: |
+      inputs.enable_security_scan && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        (
+          github.event_name == 'pull_request' &&
+          (inputs.allowed_pr_author == '' || github.event.pull_request.user.login == inputs.allowed_pr_author)
+        )
+      )
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Checkov Security Scan
+        uses: bridgecrewio/checkov-action@8f61ce5b8a3afb4ca94d236b75201878ded6d2cd # v12
+        with:
+          directory: ${{ inputs.working_directory }}
+          framework: terraform
+          quiet: true
+          soft_fail: true
+
+      - name: TFSec Security Scan
+        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
+        with:
+          working_directory: ${{ inputs.working_directory }}
+          soft_fail: true
+
+  docs:
+    name: Documentation
+    runs-on: ${{ inputs.runs_on }}
+    if: inputs.enable_docs && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Terraform Docs
+        uses: terraform-docs/gh-actions@aeae0038ed47a547e0c0571c32f2667bf4f86a5b # v1.3.0
+        with:
+          working-dir: ${{ inputs.working_directory }}
+          output-file: ${{ inputs.docs_output_file }}
+          output-method: inject
+          git-push: "true"
