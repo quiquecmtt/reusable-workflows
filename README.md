@@ -84,11 +84,37 @@ jobs:
 |-------|-------------|----------|---------|
 | `runs_on` | Runner to use | No | `ubuntu-latest` |
 | `working_directory` | Working directory for Terraform commands | No | `.` |
+| `validate_directory` | Directory for init/validate (for modules with provider aliases) | No | Same as `working_directory` |
 | `terraform_version` | Terraform version (empty for latest) | No | `""` |
 | `enable_security_scan` | Enable Checkov and TFSec scanning | No | `false` |
 | `enable_docs` | Enable terraform-docs generation | No | `false` |
 | `docs_output_file` | Output file for terraform-docs | No | `README.md` |
 | `allowed_pr_author` | GitHub username allowed to run on PRs (empty for all) | No | `""` |
+
+#### Modules with Provider Aliases
+
+For modules that use `configuration_aliases` (e.g., multi-account AWS modules), create a `tests/` directory with a fixture that provides mock providers:
+
+```hcl
+# tests/main.tf
+provider "aws" {
+  alias  = "delegating"
+  region = "us-east-1"
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+}
+
+module "test" {
+  source = "../"
+  # ... module inputs
+  providers = {
+    aws.delegating = aws.delegating
+  }
+}
+```
+
+Then set `validate_directory: "tests"` in your workflow.
 
 #### Jobs
 
@@ -127,6 +153,7 @@ jobs:
 |-------|-------------|----------|---------|
 | `runs_on` | Runner to use | No | `ubuntu-latest` |
 | `working_directory` | Working directory for OpenTofu commands | No | `.` |
+| `validate_directory` | Directory for init/validate (for modules with provider aliases) | No | Same as `working_directory` |
 | `opentofu_version` | OpenTofu version (empty for latest) | No | `""` |
 | `enable_security_scan` | Enable Checkov and TFSec scanning | No | `false` |
 | `enable_docs` | Enable terraform-docs generation | No | `false` |

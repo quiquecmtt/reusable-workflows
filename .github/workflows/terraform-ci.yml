@@ -38,6 +38,11 @@ on:
         required: false
         default: ""
         type: string
+      validate_directory:
+        description: "Directory for terraform init/validate (for modules with provider aliases, use tests/)"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   lint:
@@ -66,9 +71,11 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
+        working-directory: ${{ inputs.validate_directory || inputs.working_directory }}
         run: terraform init -backend=false
 
       - name: Terraform Validate
+        working-directory: ${{ inputs.validate_directory || inputs.working_directory }}
         run: terraform validate
 
       - name: Setup TFLint
