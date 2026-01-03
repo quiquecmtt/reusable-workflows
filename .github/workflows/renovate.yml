@@ -1,6 +1,16 @@
 name: Renovate
 
 on:
+  schedule:
+    # 9:05 AM GMT-3 = 12:05 PM UTC
+    - cron: "5 12 * * 3"
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Run Renovate with DEBUG log level"
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       debug:
@@ -25,10 +35,10 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@e084a0022424929b89d0d9af459c46c5a3f97f24 # v45.4.0
+        uses: renovatebot/github-action@8b7941943a108b2cc2150730963164aa8baeab8c # v44.2.2
         env:
           LOG_LEVEL: ${{ inputs.debug && 'debug' || 'info' }}
           RENOVATE_REPOSITORIES: ${{ github.repository }}
         with:
-          configurationFile: ${{ inputs.config_file }}
+          configurationFile: ${{ inputs.config_file || '.github/renovate.json' }}
           token: ${{ secrets.RENOVATE_TOKEN }}
