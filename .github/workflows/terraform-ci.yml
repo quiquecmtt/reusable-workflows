@@ -104,18 +104,21 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Checkov Security Scan
-        uses: bridgecrewio/checkov-action@8f61ce5b8a3afb4ca94d236b75201878ded6d2cd # v12
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
         with:
           directory: ${{ inputs.working_directory }}
           framework: terraform
-          quiet: true
           soft_fail: true
+          output_format: cli
 
-      - name: TFSec Security Scan
-        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
+      - name: Trivy Security Scan
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         with:
-          working_directory: ${{ inputs.working_directory }}
-          soft_fail: true
+          scan-type: config
+          scan-ref: ${{ inputs.working_directory }}
+          scanners: misconfig,secret
+          exit-code: 0
+          format: table
 
   docs:
     name: Documentation
